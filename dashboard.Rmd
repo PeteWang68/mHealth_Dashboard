@@ -1,0 +1,133 @@
+---
+title: "Mobile Health Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    horizontal_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(igraph)
+```
+
+Column {.sidebar data-width=250}
+-------------------------------------
+### Patient Information
+**Name:** xxx
+
+**Age:** xx
+
+**Gender:** xx
+
+**Study length:** xx
+
+### Description
+
+
+Row {data-height=400}
+-------------------------------------
+```{r, fig.height=2.8,fig.width=6}
+data = read.csv("./data/simulate_data.csv")
+nocall = which(data$Time == ".")
+data[,8] = 1
+data[nocall,8] = 0
+
+total = data %>% 
+  group_by(Date) %>% 
+  summarise(count = sum(V8))
+
+max = max(total$count)
+
+week_index = which(data$Date == "9/9/19")[[1]]
+week_data = data[week_index:nrow(data),] %>% 
+  mutate(Date = as.character(Date)) %>% 
+  mutate(Date = replace(Date, Date == "9/9/19", 1),
+         Date = replace(Date, Date == "9/10/19", 2),
+         Date = replace(Date, Date == "9/11/19", 3),
+         Date = replace(Date, Date == "9/12/19", 4),
+         Date = replace(Date, Date == "9/13/19", 5),
+         Date = replace(Date, Date == "9/14/19", 6),
+         Date = replace(Date, Date == "9/15/19", 7))
+         
+week_data %>% 
+  group_by(Date) %>% 
+  summarise(count = sum(V8)) %>% 
+  mutate(Date = as.numeric(Date)) %>% 
+  ggplot(aes(x = Date, y = count)) +
+  geom_line() +
+  geom_line(aes(y = max, color = "red")) +
+  geom_text(aes(x = 4, y = max+0.3, label = "Maximum number of call per day", color = "red")) +
+  scale_x_discrete(limit = c(1,2,3,4,5,6,7)) +
+  theme(legend.position = "none") +
+  labs(
+    title = "Number of Call per Day in the Past Week",
+    x = "Weekday",
+    y = "Number of Call"
+  )
+```
+
+### Social Network for the Past Week
+```{r, fig.height=5,fig.width=5}
+network_data = week_data %>% 
+  filter(Person != ".") %>% 
+  select(Subject, Person) %>% 
+  mutate(Subject = as.character(Subject),
+         Person = as.character(Person))
+
+net = graph.data.frame(network_data, directed = FALSE)
+V(net)$label = V(net)$name
+V(net)$degree = degree(net)
+set.seed(125)
+plot(net,
+     vertex.color = "yellow",
+     vertex.size = 20,
+     edge.arrow.size = 1.5)
+```   
+
+Row {data-height=400}
+-------------------------------------
+
+```{r, fig.height=2.6,fig.width=6}
+week_data %>% 
+  group_by(Date) %>% 
+  summarise(num = n(),
+            value = sum(Social_Active_Score)/num) %>% 
+  select(-num) %>%
+  mutate(Date = as.numeric(Date)) %>% 
+  ggplot(aes(x = Date, y = value)) +
+  geom_line(color = "blue") +
+  scale_x_discrete(limit = c(1,2,3,4,5,6,7)) +
+  labs(
+    title = "Daily Social Active Score",
+    x = "Weekday",
+    y = "Social Active Score"
+  )
+```
+
+
+```{r, fig.height=2.6,fig.width=6}
+week_data %>% 
+  group_by(Date) %>% 
+  summarise(num = n(),
+            value = sum(Loneliness_Score)/num) %>% 
+  select(-num) %>%
+  mutate(Date = as.numeric(Date)) %>% 
+  ggplot(aes(x = Date, y = value)) +
+  geom_line(color = "green") +
+  scale_x_discrete(limit = c(1,2,3,4,5,6,7)) +
+  labs(
+    title = "Daily Loneliness Score",
+    x = "Weekday",
+    y = "Loneliness Score"
+  )
+```   
+
+Row {data-height=200}
+-------------------------------------
+### Psychiatric Score in Clinic
+```{r}
+data.frame(Max = 5, Min = 1, Mean = 3)
+```
