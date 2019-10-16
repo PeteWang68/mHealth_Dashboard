@@ -3,7 +3,6 @@ title: "Mobile Health Dashboard"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
-    vertical_layout: fill
     horizontal_layout: fill
 runtime: shiny
 ---
@@ -65,8 +64,6 @@ radioButtons("type_2", "Type of Social Network Plot:",
 
 **Study length:** 2 weeks
 
-Column {data-width=200}
--------------------------------------
 ### **Description**
 
 **Fig.1** shows the trends of the number of both incoming and outgoing phone calls per day in the past week, and the maximum (or mean, minimum) number of calls in the whole study period. 
@@ -81,18 +78,61 @@ shows the percent of number of phone calls during different time part of the day
 
 **Fig.5** shows the percent of number of phone calls during different time part of the day in the past week. (Note: morning: 5:00 to 12:00; afternoon: 12:00 to 17:00; evening: 17:00 to 21:00; night: 21:00 to 5:00.)
 
-**Table.1** indicates the maximum, minimum, mean, and the latest visit of the psychiatric socre measured in clinic.
+Column {data-width=200}
+-------------------------------------
 
-### **Table.1 Psychiatric Score in Clinic**
-```{r, fig.height=1}
-data.frame(Max = 5, Min = 1, Mean = 3, Last_visit = 4) %>% 
-  knitr::kable()
-```
+```{r, fig.height=4,fig.width=4}
+renderPlot({
+  if (input$type_2 == "No direction") {
+    network_data = week_data %>% 
+     filter(Person != ".") %>% 
+     select(Subject, Person) %>% 
+     mutate(Subject = as.character(Subject),
+            Person = as.character(Person))
+    net = graph.data.frame(network_data, directed = FALSE)
+    V(net)$label = V(net)$name
+    V(net)$degree = degree(net)
+    set.seed(125)
+    plot(net,
+     vertex.color = "#F0E442",
+     vertex.size = 30,
+     edge.arrow.size = 1.5)
+    title(main = list("Fig.1 Social Network for the Past Week", cex = 1))
+  } else {
+    network_data_1 = week_data %>% 
+     filter(Person != ".") %>% 
+     select(Subject, Person, In_Out) %>%
+     mutate(Subject = as.character(Subject),
+            Person = as.character(Person))
+    network_data_2 = c(NA, NA) %>% as.matrix() %>% t() %>% as.data.frame()
+    for (i in 1:nrow(network_data_1)) {
+      if(network_data_1[i,3] == "in") {
+        network_data_2[i,1] = network_data_1[i,2]
+        network_data_2[i,2] = network_data_1[i,1]
+      } else {
+        network_data_2[i,1] = network_data_1[i,1]
+        network_data_2[i,2] = network_data_1[i,2]
+      }
+    }
+    net = graph.data.frame(network_data_2, directed = TRUE)
+    V(net)$label = V(net)$name
+    V(net)$degree = degree(net)
+    E(net)$type = network_data_1$In_Out
+    set.seed(125)
+    plot(net,
+     vertex.color = "#F0E442",
+     vertex.size = 30,
+     edge.arrow.size = 0.7,
+     edge.color = E(net)$type)
+title(main = list("Fig.1 Social Network for the Past Week", cex = 1))
+  }
+})
+```   
 
 Column {data-width=300}
 -------------------------------------
 
-```{r, fig.width=5.5, fig.height=3}
+```{r, fig.width=5.5, fig.height=1}
 max_in = total %>% 
   filter(In_Out == "in")  
 max_incoming = max(max_in$count)
@@ -146,7 +186,7 @@ pastweek %>%
         axis.title = element_text(size = 12.5),
         axis.text = element_text(size = 12.5)) +
   labs(
-    title = "Fig.1 Number of Call per Day in the Past Week",
+    title = "Fig.2 Number of Call per Day in the Past Week",
     x = "Weekday",
     y = "Number of Call"
   )
@@ -168,7 +208,7 @@ pastweek %>%
         axis.title = element_text(size = 12.5),
         axis.text = element_text(size = 12.5)) +
   labs(
-    title = "Fig.1 Number of Call per Day in the Past Week",
+    title = "Fig.2 Number of Call per Day in the Past Week",
     x = "Weekday",
     y = "Number of Call"
   )
@@ -191,7 +231,7 @@ pastweek %>%
         axis.text = element_text(size = 12.5)) +
   scale_fill_discrete(breaks = c("Incoming", "Outgoing", "Max Incoming", "Max Outgoing")) +
   labs(
-    title = "Fig.1 Number of Call per Day in the Past Week",
+    title = "Fig.2 Number of Call per Day in the Past Week",
     x = "Weekday",
     y = "Number of Call"
   )
@@ -212,7 +252,7 @@ pastweek %>%
         axis.title = element_text(size = 12.5),
         axis.text = element_text(size = 12.5)) +
   labs(
-    title = "Fig.1 Number of Call per Day in the Past Week",
+    title = "Fig.2 Number of Call per Day in the Past Week",
     x = "Weekday",
     y = "Number of Call"
   )
@@ -221,106 +261,48 @@ pastweek %>%
 ```
 
 ```{r, fig.width=5.5, fig.height=2.2}
-week_data %>% 
+Social_activity = week_data %>% 
   group_by(Date) %>% 
   summarise(num = n(),
             value = sum(Social_Active_Score)/num) %>% 
   select(-num) %>%
-  mutate(Date = as.numeric(Date)) %>% 
-  ggplot(aes(x = Date, y = value)) +
-  geom_line(color = "#56B4E9", size = 1.5) +
-  geom_point(color = "#56B4E9", size = 3) +
-  geom_text(aes(label = value), vjust = -0.7, size = 4) +
-  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) +
-  scale_y_discrete(limit = c(0,1,2,3,4)) +
-  labs(
-    title = "Fig.2 Daily Social Activity Score",
-    x = "Weekday",
-    y = "Social Active Score"
-  ) +
-  theme(plot.title = element_text(size = 10, face = "bold"),
-        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
-        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
-        axis.title = element_text(size = 10),
-        axis.text = element_text(size = 10))
-```
+  mutate(Date = as.numeric(Date)) 
 
-```{r, fig.width=5.5, fig.height=2.2}
-week_data %>% 
+Loneliness = week_data %>% 
   group_by(Date) %>% 
   summarise(num = n(),
             value = sum(Loneliness_Score)/num) %>% 
   select(-num) %>%
   mutate(Date = as.numeric(Date)) %>% 
-  ggplot(aes(x = Date, y = value)) +
-  geom_line(color = "#66CC99", size = 1.5) +
-  geom_point(color = "#66CC99", size = 3) +
-  geom_text(aes(label = value), vjust = -0.7, size = 4) +
+  as.data.frame()
+
+ggplot() +
+  geom_line(data = Social_activity, aes(x = Date, y = value, color = "Social Activity"), size = 1.5) +
+  geom_point(data = Social_activity, aes(x = Date, y = value), color = "#56B4E9", size = 3) +
+  geom_text(data = Social_activity, aes(x = Date, y = value, label = value), vjust = -0.7, size = 4) +
+  geom_line(data = Loneliness, aes(x = Date, y = value, color = "Loneliness"), size = 1.5) +
+  geom_point(data = Loneliness, aes(x = Date, y = value), color = "#66CC99", size = 3) +
+  geom_text(data = Loneliness, aes(x = Date, y = value, label = value), vjust = -0.7, size = 4) +
   scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) +
   scale_y_discrete(limit = c(0,1,2,3)) +
+  scale_colour_manual(values = c("Social Activity" = "#56B4E9", "Loneliness" = "#66CC99")) +
   labs(
-    title = "Fig.3 Daily Loneliness Score",
+    title = "Fig.3 Daily Self-Assessment Score",
     x = "Weekday",
-    y = "Loneliness Score"
+    y = "Self-Assessment Score"
   ) +
   theme(plot.title = element_text(size = 10, face = "bold"),
         panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
         panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
         axis.title = element_text(size = 10),
-        axis.text = element_text(size = 10))
-
-```   
+        axis.text = element_text(size = 10),
+        legend.title = element_blank(),
+        legend.position = c(0.2,0.9),
+        legend.direction = "horizontal") 
+```
 
 Column {data-width=300}
 -------------------------------------
-
-```{r, fig.height=4,fig.width=4}
-renderPlot({
-  if (input$type_2 == "No direction") {
-    network_data = week_data %>% 
-     filter(Person != ".") %>% 
-     select(Subject, Person) %>% 
-     mutate(Subject = as.character(Subject),
-            Person = as.character(Person))
-    net = graph.data.frame(network_data, directed = FALSE)
-    V(net)$label = V(net)$name
-    V(net)$degree = degree(net)
-    set.seed(125)
-    plot(net,
-     vertex.color = "#F0E442",
-     vertex.size = 30,
-     edge.arrow.size = 1.5)
-    title(main = list("Fig.4 Social Network for the Past Week", cex = 1))
-  } else {
-    network_data_1 = week_data %>% 
-     filter(Person != ".") %>% 
-     select(Subject, Person, In_Out) %>%
-     mutate(Subject = as.character(Subject),
-            Person = as.character(Person))
-    network_data_2 = c(NA, NA) %>% as.matrix() %>% t() %>% as.data.frame()
-    for (i in 1:nrow(network_data_1)) {
-      if(network_data_1[i,3] == "in") {
-        network_data_2[i,1] = network_data_1[i,2]
-        network_data_2[i,2] = network_data_1[i,1]
-      } else {
-        network_data_2[i,1] = network_data_1[i,1]
-        network_data_2[i,2] = network_data_1[i,2]
-      }
-    }
-    net = graph.data.frame(network_data_2, directed = TRUE)
-    V(net)$label = V(net)$name
-    V(net)$degree = degree(net)
-    E(net)$type = network_data_1$In_Out
-    set.seed(125)
-    plot(net,
-     vertex.color = "#F0E442",
-     vertex.size = 30,
-     edge.arrow.size = 0.7,
-     edge.color = E(net)$type)
-title(main = list("Fig.4 Social Network for the Past Week", cex = 2))
-  }
-})
-```   
 
 ```{r, fig.height=3.5,fig.width=4}
 percent_data = week_data %>% 
@@ -344,7 +326,7 @@ percent_data %>%
   geom_bar(stat = "identity",position = "dodge", width = 0.8) +
   geom_text(aes(label = Percent), vjust = -0.7, size = 4, position = position_dodge(width = 0.8)) +
   labs(
-    title = "Fig.5 Percent of Calls for Different Part of the Day",
+    title = "Fig.4 Percent of Calls for Different Part of the Day",
     x = "Part of the Day",
     y = "Percent of Total Calls") +
   scale_fill_discrete(labels = c("Incoming", "Outgoing")) +
