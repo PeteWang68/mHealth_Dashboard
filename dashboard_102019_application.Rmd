@@ -1,0 +1,392 @@
+---
+title: "Mobile Health Dashboard Application"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    horizontal_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(igraph)
+```
+
+```{r global, include=FALSE}
+setwd("/data/sbdp/PHOENIX/GENERAL/BLS/7NE49/phone/raw/949iuit/calls")
+
+file_list <- list.files()
+for (file in file_list){
+  # if the merged dataset doesn't exist, create it
+  if (!exists("d")){
+    d <- read.csv(file, header=TRUE, sep=",")
+  }
+  # if the merged dataset does exist, append to it
+  if (exists("d")){
+    temp_d <-read.table(file, header=TRUE, sep=",")
+    d<-rbind(d, temp_d)
+    rm(temp_d)
+  }
+  
+}
+
+head(d)
+d$day <- d$UTC.time
+d$day <- substr(d$day, 1, 10)
+
+
+setwd("~/Documents")
+x <- write.table(d,"merged_call_7NE49_10012019.txt")
+data<-read.table("merged_call_7NE49_10012019.txt")
+head(data)
+#     timestamp                UTC.time                          hashed.phone.number     call.type duration.in.seconds        day
+# 1 1.455310e+12 2016-02-12T20:48:46.110 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 119 2016-02-12
+# 2 1.455310e+12 2016-02-12T20:48:46.110 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 119 2016-02-12
+# 3 1.455311e+12 2016-02-12T21:03:37.435 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 139 2016-02-12
+# 4 1.455311e+12 2016-02-12T21:11:11.443 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 175 2016-02-12
+# 5 1.455387e+12 2016-02-13T18:07:32.487 LjdINZHTeXnAaO9SO0x7j7t1Lo75HvsUp89CaWDfWFI= Incoming Call                  26 2016-02-13
+# 6 1.455387e+12 2016-02-13T18:14:32.886 LjdINZHTeXnAaO9SO0x7j7t1Lo75HvsUp89CaWDfWFI= Outgoing Call                  37 2016-02-13
+
+
+#create the day, weekday, hour variable,time of the day,week/week-end, month, year variable
+
+#expand dataset and set 0 the call.type variable if there is not call event in that hour etc..
+nocall = which(data$Time == ".")
+data[,8] = 1
+data[nocall,8] = 0
+
+#rearrange data grouping it by "day" variable and "call.type"
+total = data %>% 
+  group_by(Date, In_Out) %>% 
+  summarise(count = sum(V8))
+week_index = which(data$Date == "9/9/19")[[1]]
+week_data = data[week_index:nrow(data),] %>% 
+  mutate(Date = as.character(Date)) %>% 
+  mutate(Date = replace(Date, Date == "9/9/19", 1),
+         Date = replace(Date, Date == "9/10/19", 2),
+         Date = replace(Date, Date == "9/11/19", 3),
+         Date = replace(Date, Date == "9/12/19", 4),
+         Date = replace(Date, Date == "9/13/19", 5),
+         Date = replace(Date, Date == "9/14/19", 6),
+         Date = replace(Date, Date == "9/15/19", 7))
+```
+
+Column {.sidebar data-width=200}
+-------------------------------------
+
+```{r}
+#this should stay the same
+selectInput("SUBJID", "Subject ID:",
+            choices = c(1:10), selected = 1)
+radioButtons("data_type", "Type of Data:",
+             c("Phone Call", "Text"),
+             selected = "Phone Call")
+radioButtons("type", "Type of Summary in Fig.1:",
+             c("Max", "Mean", "Min", "None"),
+             selected = "None")
+radioButtons("type_2", "Type of Social Network Plot:",
+             c("No direction", "With direction"),
+             selected = "No direction")
+```
+
+##### **Patient Information**
+
+#FROM SURVEY DAY 1 FOLDER
+
+**ID:** xxx
+
+**Age:** xx
+
+**Gender:** xx
+
+**Study length:** 2 weeks
+
+Column {data-width=200}
+-------------------------------------
+### **Description**
+
+**Fig.1** shows the trends of the number of both incoming and outgoing phone calls per day in the past week, and the maximum (or mean, minimum) number of calls in the whole study period. 
+
+**Fig.2** shows the weekly trends in daily self-report of social activity score. (Note: The self-assessment result range from 0 to 3, where 0 means no social activity at all and 3 means extremely high social active.)
+shows the social network through phones in the past week. And each line connection between two subjects indicates one-time phone call. 
+
+**Fig.3** shows the weekly trends in daily self-report of loneliness. (Note: The self-assessment result range from 0 to 3, where 0 means extremely lonely and 3 means not lonely at all.)
+shows the percent of number of phone calls during different time part of the day in the past week. (Note: morning: 5:00 to 12:00; afternoon: 12:00 to 17:00; evening: 17:00 to 21:00; night: 21:00 to 5:00.)
+
+**Fig.4** shows the social network through phones in the past week. And each line connection between two subjects indicates one-time phone call. 
+
+**Fig.5** shows the percent of number of phone calls during different time part of the day in the past week. (Note: morning: 5:00 to 12:00; afternoon: 12:00 to 17:00; evening: 17:00 to 21:00; night: 21:00 to 5:00.)
+
+**Table.1** indicates the maximum, minimum, mean, and the latest visit of the psychiatric socre measured in clinic.
+
+### **Table.1 Psychiatric Score in Clinic**
+```{r, fig.height=1}
+#open the clinic survey data
+#create a longitudinal dataset time will be in weeks
+#extract summary stat
+data.frame(Max = 5, Min = 1, Mean = 3, Last_visit = 4) %>% 
+  knitr::kable()
+```
+
+Column {data-width=300}
+-------------------------------------
+
+```{r, fig.width=5.5, fig.height=3}
+#use call data from above
+max_in = total %>% 
+  filter(In_Out == "in")  
+max_incoming = max(max_in$count)
+mean_incoming = mean(max_in$count)
+min_incoming = min(max_in$count)
+max_out = total %>% 
+  filter(In_Out == "out")  
+max_outgoing = max(max_out$count)
+mean_outgoing = mean(max_out$count)
+min_outgoing = min(max_out$count)
+         
+week_data_in = week_data %>%
+  filter(In_Out %in% c(".", "in")) %>% 
+  group_by(Date) %>%
+  summarise(count = sum(V8)) %>% 
+  mutate(Date = as.numeric(Date))
+week_data_out = week_data %>%
+  filter(In_Out %in% c(".", "out")) %>% 
+  group_by(Date) %>%
+  summarise(count = sum(V8)) %>% 
+  mutate(Date = as.numeric(Date))
+date = cbind(Date = c(1:7), count = c(1:7)) %>% as.data.frame()
+pastweek = merge(week_data_in, week_data_out, by = "Date", all = TRUE) %>% 
+  merge(., date, by = "Date", all = TRUE) %>% 
+  mutate(Incoming = count.x,
+         Outgoing = count.y) %>% 
+  select(Date, Incoming, Outgoing) %>% 
+  gather(key = in_out, value = count, Incoming:Outgoing)
+pastweek[is.na(pastweek)] <- 0
+renderPlot({ 
+   if (input$type == "Max") {
+pastweek %>% 
+  ggplot(aes(x = Date, y = count, col = in_out)) +
+  geom_line(size = 1.5) +
+  geom_line(aes(y = max_incoming, col = "Max Incoming"), size = 1.5) +
+  geom_line(aes(y = max_outgoing, col = "Max Outgoing"), size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
+  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) + 
+  theme(plot.title = element_text(face = "bold"),
+        legend.title = element_blank(),
+        legend.position = c(0.9,0.9),
+        legend.direction = "vertical",
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
+        axis.title = element_text(size = 12.5),
+        axis.text = element_text(size = 12.5)) +
+  labs(
+    title = "Fig.1 Number of Call per Day in the Past Week",
+    x = "Weekday",
+    y = "Number of Call"
+  )
+   } else if (input$type == "Mean") {
+pastweek %>% 
+  ggplot(aes(x = Date, y = count, col = in_out)) +
+  geom_line(size = 1.5) +
+  geom_line(aes(y = mean_incoming, col = "Mean Incoming"), size = 1.5) +
+  geom_line(aes(y = mean_outgoing, col = "Mean Outgoing"), size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
+  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) + 
+  theme(plot.title = element_text(face = "bold"),
+        legend.title = element_blank(),
+        legend.position = c(0.9,0.9),
+        legend.direction = "vertical",
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
+        axis.title = element_text(size = 12.5),
+        axis.text = element_text(size = 12.5)) +
+  labs(
+    title = "Fig.1 Number of Call per Day in the Past Week",
+    x = "Weekday",
+    y = "Number of Call"
+  )
+   } else if (input$type == "Min") {
+pastweek %>% 
+  ggplot(aes(x = Date, y = count, col = in_out)) +
+  geom_line(size = 1.5) +
+  geom_line(aes(y = min_incoming, col = "Min Incoming"), size = 1.5) +
+  geom_line(aes(y = min_outgoing, col = "Min Outgoing"), size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
+  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) + 
+  theme(plot.title = element_text(face = "bold"),
+        legend.title = element_blank(),
+        legend.position = c(0.9,0.9),
+        legend.direction = "vertical",
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
+        axis.title = element_text(size = 12.5),
+        axis.text = element_text(size = 12.5)) +
+  scale_fill_discrete(breaks = c("Incoming", "Outgoing", "Max Incoming", "Max Outgoing")) +
+  labs(
+    title = "Fig.1 Number of Call per Day in the Past Week",
+    x = "Weekday",
+    y = "Number of Call"
+  )
+   } else if (input$type == "None") {
+pastweek %>% 
+  ggplot(aes(x = Date, y = count, col = in_out)) +
+  geom_line(size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
+  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) + 
+  scale_y_discrete(limit = c(0,1,2,3)) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.title = element_blank(),
+        legend.position = c(0.9,0.9),
+        legend.direction = "horizontal",
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
+        axis.title = element_text(size = 12.5),
+        axis.text = element_text(size = 12.5)) +
+  labs(
+    title = "Fig.1 Number of Call per Day in the Past Week",
+    x = "Weekday",
+    y = "Number of Call"
+  )
+   }
+})
+```
+
+```{r, fig.width=5.5, fig.height=2.2}
+week_data %>% 
+  group_by(Date) %>% 
+  summarise(num = n(),
+            value = sum(Social_Active_Score)/num) %>% 
+  select(-num) %>%
+  mutate(Date = as.numeric(Date)) %>% 
+  ggplot(aes(x = Date, y = value)) +
+  geom_line(color = "#56B4E9", size = 1.5) +
+  geom_point(color = "#56B4E9", size = 3) +
+  geom_text(aes(label = value), vjust = -0.7, size = 4) +
+  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) +
+  scale_y_discrete(limit = c(0,1,2,3,4)) +
+  labs(
+    title = "Fig.2 Daily Social Activity Score",
+    x = "Weekday",
+    y = "Social Active Score"
+  ) +
+  theme(plot.title = element_text(size = 10, face = "bold"),
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 10))
+```
+
+```{r, fig.width=5.5, fig.height=2.2}
+week_data %>% 
+  group_by(Date) %>% 
+  summarise(num = n(),
+            value = sum(Loneliness_Score)/num) %>% 
+  select(-num) %>%
+  mutate(Date = as.numeric(Date)) %>% 
+  ggplot(aes(x = Date, y = value)) +
+  geom_line(color = "#66CC99", size = 1.5) +
+  geom_point(color = "#66CC99", size = 3) +
+  geom_text(aes(label = value), vjust = -0.7, size = 4) +
+  scale_x_discrete(limit = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) +
+  scale_y_discrete(limit = c(0,1,2,3)) +
+  labs(
+    title = "Fig.3 Daily Loneliness Score",
+    x = "Weekday",
+    y = "Loneliness Score"
+  ) +
+  theme(plot.title = element_text(size = 10, face = "bold"),
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80"),
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 10))
+```   
+
+Column {data-width=300}
+-------------------------------------
+
+```{r, fig.height=4,fig.width=4}
+renderPlot({
+  if (input$type_2 == "No direction") {
+    network_data = week_data %>% 
+     filter(Person != ".") %>% 
+     select(Subject, Person) %>% 
+     mutate(Subject = as.character(Subject),
+            Person = as.character(Person))
+    net = graph.data.frame(network_data, directed = FALSE)
+    V(net)$label = V(net)$name
+    V(net)$degree = degree(net)
+    set.seed(125)
+    plot(net,
+     vertex.color = "#F0E442",
+     vertex.size = 30,
+     edge.arrow.size = 1.5)
+    title(main = list("Fig.4 Social Network for the Past Week", cex = 1))
+  } else {
+    network_data_1 = week_data %>% 
+     filter(Person != ".") %>% 
+     select(Subject, Person, In_Out) %>%
+     mutate(Subject = as.character(Subject),
+            Person = as.character(Person))
+    network_data_2 = c(NA, NA) %>% as.matrix() %>% t() %>% as.data.frame()
+    for (i in 1:nrow(network_data_1)) {
+      if(network_data_1[i,3] == "in") {
+        network_data_2[i,1] = network_data_1[i,2]
+        network_data_2[i,2] = network_data_1[i,1]
+      } else {
+        network_data_2[i,1] = network_data_1[i,1]
+        network_data_2[i,2] = network_data_1[i,2]
+      }
+    }
+    net = graph.data.frame(network_data_2, directed = TRUE)
+    V(net)$label = V(net)$name
+    V(net)$degree = degree(net)
+    E(net)$type = network_data_1$In_Out
+    set.seed(125)
+    plot(net,
+     vertex.color = "#F0E442",
+     vertex.size = 30,
+     edge.arrow.size = 0.7,
+     edge.color = E(net)$type)
+title(main = list("Fig.4 Social Network for the Past Week", cex = 2))
+  }
+})
+```   
+
+```{r, fig.height=3.5,fig.width=4}
+percent_data = week_data %>% 
+  filter(Time != ".") %>% 
+  mutate(Time = str_replace(Time, ":", "."),
+         Time = as.numeric(Time)) %>% 
+  mutate(Period = ifelse(Time > 5 & Time <= 12, "morning",
+                  ifelse(Time > 12 & Time <= 17, "afternoon",
+                  ifelse(Time > 17 & Time <= 21, "evening", "night"))),
+         Period = factor(Period, levels = c("morning", "afternoon", "evening", "night"))) 
+num = nrow(percent_data)
+percent <- function(x, digits = 1, format = "f", ...) {
+  paste0(formatC(100 * x, format = format, digits = digits, ...), "%")
+}
+percent_data %>% 
+  group_by(Period, In_Out) %>% 
+  summarise(Percent = percent(n()/num)) %>% 
+  ggplot(aes(x = Period, y = Percent, fill = In_Out)) +
+  geom_bar(stat = "identity",position = "dodge", width = 0.8) +
+  geom_text(aes(label = Percent), vjust = -0.7, size = 4, position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Fig.5 Percent of Calls for Different Part of the Day",
+    x = "Part of the Day",
+    y = "Percent of Total Calls") +
+  scale_fill_discrete(labels = c("Incoming", "Outgoing")) +
+  scale_y_discrete(limit = c("7.7%", "15.4%", "30.8%")) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0.75,0.95),
+        legend.direction = "horizontal",
+        plot.title = element_text(size = 10, face = "bold"),
+        panel.background = element_rect(fill = "white", colour = "grey80", size = 0.7, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = "grey80")) 
+```   
