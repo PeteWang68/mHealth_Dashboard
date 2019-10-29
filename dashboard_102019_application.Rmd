@@ -48,10 +48,34 @@ head(data)
 # 4 1.455311e+12 2016-02-12T21:11:11.443 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 175 2016-02-12
 # 5 1.455387e+12 2016-02-13T18:07:32.487 LjdINZHTeXnAaO9SO0x7j7t1Lo75HvsUp89CaWDfWFI= Incoming Call                  26 2016-02-13
 # 6 1.455387e+12 2016-02-13T18:14:32.886 LjdINZHTeXnAaO9SO0x7j7t1Lo75HvsUp89CaWDfWFI= Outgoing Call                  37 2016-02-13
+```
 
+```{r}
+#Import the dataset
+data = read.csv("./data/simulation2.csv")
 
 #create the day, weekday, hour variable,time of the day,week/week-end, month, year variable
+##transfer the data into number of day in the year
+Diff = function(x, start) {as.numeric(x - as.Date(cut(start, "year")))}
+data = data %>% 
+  mutate(day = as.Date(day),
+         NumDays = Diff(day, day[1]))
 
+#create the day, weekday, hour variable,time of the day,week/week-end, month, year variable
+full_day = c(244:257) %>% as.data.frame()
+colnames(full_day) = "NumDays"
+full_data = merge(data, full_day, by = "NumDays", all = T)
+  
+for (i in 1:nrow(full_data)) {
+  full_data$day[i] = as.Date(full_data$NumDays[i], origin = "2019-01-01")
+}
+
+full_data = full_data %>% 
+  mutate(WeekDays = weekdays(day),
+         Time = sapply(UTC.time, substring, 12,19),
+         Hour = sapply(UTC.time, substring, 12,13))
+
+##transfer the 
 #expand dataset and set 0 the call.type variable if there is not call event in that hour etc..
 nocall = which(data$Time == ".")
 data[,8] = 1
