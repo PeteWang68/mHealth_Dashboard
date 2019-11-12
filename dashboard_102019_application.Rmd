@@ -15,32 +15,14 @@ library(igraph)
 ```
 
 ```{r global, include=FALSE}
-setwd("/data/sbdp/PHOENIX/GENERAL/BLS/7NE49/phone/raw/949iuit/calls")
+#Import the dataset
+data<-read.table("~/Documents/merged_call_7NE49_10012019.txt")
 
-file_list <- list.files()
-for (file in file_list){
-  # if the merged dataset doesn't exist, create it
-  if (!exists("d")){
-    d <- read.csv(file, header=TRUE, sep=",")
-  }
-  # if the merged dataset does exist, append to it
-  if (exists("d")){
-    temp_d <-read.table(file, header=TRUE, sep=",")
-    d<-rbind(d, temp_d)
-    rm(temp_d)
-  }
-  
-}
-
-head(d)
-d$day <- d$UTC.time
-d$day <- substr(d$day, 1, 10)
-
-
-setwd("~/Documents")
-x <- write.table(d,"merged_call_7NE49_10012019.txt")
-data<-read.table("merged_call_7NE49_10012019.txt")
 head(data)
+data$day <- data$UTC.time
+data$day <- substr(data$day, 1, 10)
+
+
 #     timestamp                UTC.time                          hashed.phone.number     call.type duration.in.seconds        day
 # 1 1.455310e+12 2016-02-12T20:48:46.110 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 119 2016-02-12
 # 2 1.455310e+12 2016-02-12T20:48:46.110 01h9Hq4Y29glTv6YUaxQNZ1S4nJchtf6iwu_VKeHPsI= Outgoing Call                 119 2016-02-12
@@ -51,8 +33,6 @@ head(data)
 ```
 
 ```{r}
-#Import the dataset
-data = read.csv("./data/simulation2.csv")
 
 #create the day, weekday, hour variable,time of the day,week/week-end, month, year variable
 ##transfer the data into number of day in the year
@@ -61,13 +41,17 @@ data = data %>%
   mutate(day = as.Date(day),
          NumDays = Diff(day, day[1]))
 
+data$NumDays[1]
+
 #create the day, weekday, hour variable,time of the day,week/week-end, month, year variable
-full_day = c(244:257) %>% as.data.frame()
+
+
+full_day = c(data$NumDays[1]:data$NumDays[length(data$NumDays)]) %>% as.data.frame()
 colnames(full_day) = "NumDays"
 full_data = merge(data, full_day, by = "NumDays", all = T)
   
 for (i in 1:nrow(full_data)) {
-  full_data$day[i] = as.Date(full_data$NumDays[i], origin = "2019-01-01")
+  full_data$day[i] = as.Date(full_data$NumDays[i], origin = "2016-01-01")
 }
 
 full_data = full_data %>% 
@@ -77,24 +61,29 @@ full_data = full_data %>%
 
 ##transfer the 
 #expand dataset and set 0 the call.type variable if there is not call event in that hour etc..
-nocall = which(data$Time == ".")
-data[,8] = 1
-data[nocall,8] = 0
+nocall = which(is.na(full_data$Time))
+full_data[,ncol(full_data)+1] = 1
+full_data[nocall,ncol(full_data)] = 0
+##TO DO : V11. SHOULD BE A GENERAL NAME "CALLINDICATOR"##
 
 #rearrange data grouping it by "day" variable and "call.type"
-total = data %>% 
-  group_by(Date, In_Out) %>% 
-  summarise(count = sum(V8))
-week_index = which(data$Date == "9/9/19")[[1]]
-week_data = data[week_index:nrow(data),] %>% 
-  mutate(Date = as.character(Date)) %>% 
-  mutate(Date = replace(Date, Date == "9/9/19", 1),
-         Date = replace(Date, Date == "9/10/19", 2),
-         Date = replace(Date, Date == "9/11/19", 3),
-         Date = replace(Date, Date == "9/12/19", 4),
-         Date = replace(Date, Date == "9/13/19", 5),
-         Date = replace(Date, Date == "9/14/19", 6),
-         Date = replace(Date, Date == "9/15/19", 7))
+total = full_data %>% 
+  group_by(NumDays, call.type) %>% 
+  summarise(count = sum(V11))
+
+week_index = which(full_data$day == "2017-10-09")[[1]]
+week_data = full_data[week_index:nrow(full_data),] %>% 
+  mutate(Date = as.character(day)) %>% 
+  mutate(Date = replace(Date, Date == "2017-10-09", 1),
+         Date = replace(Date, Date == "2017-10-10", 2),
+         Date = replace(Date, Date == "2017-10-11", 3),
+         Date = replace(Date, Date == "2017-10-12", 4),
+         Date = replace(Date, Date == "2017-10-13", 5),
+         Date = replace(Date, Date == "2017-10-14", 6),
+         Date = replace(Date, Date == "2017-10-15", 7))
+#Error in mutate(Date = as.character(day)) : object 'day' not found
+
+#TO DO: make it general start from: full_data$day[nrow(full_data)]
 ```
 
 Column {.sidebar data-width=200}
@@ -160,21 +149,23 @@ Column {data-width=300}
 ```{r, fig.width=5.5, fig.height=3}
 #use call data from above
 max_in = total %>% 
-  filter(In_Out == "in")  
+  filter(call.type == "Incoming Call")  
 max_incoming = max(max_in$count)
 mean_incoming = mean(max_in$count)
 min_incoming = min(max_in$count)
 max_out = total %>% 
-  filter(In_Out == "out")  
+  filter(call.type == "Outgoing Call")  
 max_outgoing = max(max_out$count)
 mean_outgoing = mean(max_out$count)
 min_outgoing = min(max_out$count)
-         
+
+#TO DO: add missed call
+         #####WE GOT UNTIL HERE
 week_data_in = week_data %>%
-  filter(In_Out %in% c(".", "in")) %>% 
-  group_by(Date) %>%
-  summarise(count = sum(V8)) %>% 
-  mutate(Date = as.numeric(Date))
+  filter(call.type %in% c(".", "Incoming Call")) %>% 
+  group_by(NumDays) %>%
+  summarise(count = sum(V11)) %>% 
+  mutate(NumDays = as.numeric(NumDays))
 week_data_out = week_data %>%
   filter(In_Out %in% c(".", "out")) %>% 
   group_by(Date) %>%
