@@ -167,12 +167,13 @@ max_in = total %>%
 max_incoming = max(max_in$count)
 mean_incoming = mean(max_in$count)
 min_incoming = min(max_in$count)
+
 max_out = total %>% 
   filter(call.type == "Outgoing Call")  
 max_outgoing = max(max_out$count)
 mean_outgoing = mean(max_out$count)
 min_outgoing = min(max_out$count)
-## missing call??
+
 max_miss = total %>%   
   filter(call.type == "Missed Call")  
 max_missing = max(max_miss$count)
@@ -212,6 +213,7 @@ pastweek %>%
   geom_line(size = 1.5) +
   geom_line(aes(y = max_incoming, col = "Max Incoming"), size = 1.5) +
   geom_line(aes(y = max_outgoing, col = "Max Outgoing"), size = 1.5) +
+  geom_line(aes(y = max_missing, col = "Max Missing"), size = 1.5) +
   geom_point(size = 3) +
   geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
   scale_x_discrete(limit = week_label) + 
@@ -230,10 +232,11 @@ pastweek %>%
   )
    } else if (input$type == "Mean") {
 pastweek %>% 
-  ggplot(aes(x = NumDays, y = count, col = in_out)) +
+  ggplot(aes(x = NumDays, y = count, col = in_out_miss)) +
   geom_line(size = 1.5) +
   geom_line(aes(y = mean_incoming, col = "Mean Incoming"), size = 1.5) +
   geom_line(aes(y = mean_outgoing, col = "Mean Outgoing"), size = 1.5) +
+  geom_line(aes(y = mean_missing, col = "Mean Missing"), size = 1.5) +
   geom_point(size = 3) +
   geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
   scale_x_discrete(limit = week_label) + 
@@ -252,10 +255,11 @@ pastweek %>%
   )
    } else if (input$type == "Min") {
 pastweek %>% 
-  ggplot(aes(x = NumDays, y = count, col = in_out)) +
+  ggplot(aes(x = NumDays, y = count, col = in_out_miss)) +
   geom_line(size = 1.5) +
   geom_line(aes(y = min_incoming, col = "Min Incoming"), size = 1.5) +
   geom_line(aes(y = min_outgoing, col = "Min Outgoing"), size = 1.5) +
+  geom_line(aes(y = min_missing, col = "Min Missing"), size = 1.5) +
   geom_point(size = 3) +
   geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
   scale_x_discrete(limit = week_label) + 
@@ -275,7 +279,7 @@ pastweek %>%
   )
    } else if (input$type == "None") {
 pastweek %>% 
-  ggplot(aes(x = NumDays, y = count, col = in_out)) +
+  ggplot(aes(x = NumDays, y = count, col = in_out_miss)) +
   geom_line(size = 1.5) +
   geom_point(size = 3) +
   geom_text(aes(label = count), vjust = -0.7, size = 4, color = "black") +
@@ -296,7 +300,6 @@ pastweek %>%
   )
    }
 })
-#ADD MISSED
 ```
 
 ```{r, fig.width=5.5, fig.height=2.2}
@@ -425,8 +428,7 @@ percent_data %>%
     title = "Fig.5 Percent of Calls for Different Part of the Day",
     x = "Part of the Day",
     y = "Percent of Total Calls") +
-  scale_fill_discrete(labels = c("Incoming", "Outgoing")) +
-  scale_y_discrete(limit = c("7.7%", "15.4%", "30.8%")) +
+  scale_fill_discrete(labels = c("Incoming", "Outgoing", "Missing")) +
   theme(legend.title = element_blank(),
         legend.position = c(0.75,0.95),
         legend.direction = "horizontal",
